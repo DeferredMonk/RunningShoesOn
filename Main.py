@@ -1,119 +1,124 @@
-from multiprocessing import set_forkserver_preload
-from platform import python_branch
-from tkinter import CENTER, Toplevel
-from turtle import right, title, width
 import pygame
-import CustomClasses, CustomFunctions
+import Props, Stages
 
-# GLOBAL VARIABLES
-pygame.font.init()
-WIDTH = 640
-HEIGHT = 480
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-clock = pygame.time.Clock()
-movRight, movLeft, jump, jumpStartingPoint = False, False, False, 442
+# Colors
+BLUE = (0,213,255)
+ 
+# Screen dimensions
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 480 
 
-mainMenu = True
-cloud_group = CustomFunctions.createClouds(5, CustomClasses.Cloud)
+def main(Mainmenu):
+	""" Main Program """
+	pygame.init()
+ 
+	# Set the height and width of the screen
+	size = [SCREEN_WIDTH, SCREEN_HEIGHT]
+	screen = pygame.display.set_mode(size)
+ 
+	pygame.display.set_caption("Running shoes on!") #Name the game
+ 
+	# Create the player
+	player = Props.Player()
 
-#Player
-
-char = CustomClasses.Character(320, 400)
-
-#Text section
-
-text_group = pygame.sprite.Group()
-
-title = CustomClasses.Text("RUNNING SHOES ON!!!", "04B_30__.TTF", 30, (0, 7, 222), 320, 0, False, True)
-pressToPlay = CustomClasses.Text("Press SPACE to play!", "04B_30__.TTF", 25, (255, 255, 255), 320, 300, True, False)
-
-text_group.add(title)
-text_group.add(pressToPlay)
-
-#Tile section
-
-MainMenuTiles = CustomClasses.Tile("stoneHalf.png", 320, 442)
-stackOfTiles = pygame.sprite.Group()
-CustomFunctions.addToStackTiles(stackOfTiles, 5, 200, 442)
-CustomFunctions.addToStackTiles(stackOfTiles, 2, 50, 300)
-CustomFunctions.addToStackTiles(stackOfTiles, 1, 150, 402)
-
-
-
-
-pygame.init()
-
-while exit:
+	#Create interactive screens
+	menu = Stages.MainMenu()
+	game = Stages.MainGame(player)
+	gg = Stages.GameOver(player)
+	victoryscreen = Stages.Victory(player)
 	
-	for event in pygame.event.get():
-		if event.type == pygame.QUIT:
-			exit = False
+	Gameover = False
+  
+	#Create group of active sprites
+	active_sprite_list = pygame.sprite.Group()
+	
+	#Setup player
+	player.level = game
+	player.rect.x = 320 - player.image.get_width()
+	player.rect.y = -100
 
-		if event.type == pygame.KEYDOWN: #Button press ->
+	active_sprite_list.add(player)
+ 
+	# Loop until the user clicks the close button.
+	done = False
+ 
+	# Used to manage how fast the screen updates
+	clock = pygame.time.Clock()
+ 
+	# -------- Main Program Loop -----------
+	while not done:
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				done = True
+ 
+			if event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_a: #Move left
+					player.go_left()
+				if event.key == pygame.K_d:	#Move right
+					player.go_right()
+				if event.key == pygame.K_w: #Jump
+					player.jump()
+				if event.key == pygame.K_SPACE:
+					if Mainmenu == True: #Start playing
+						Mainmenu = False
+					elif Gameover or victory:	#Restarts the game
+						main(False)				
 
-			if event.key == pygame.K_SPACE: #Exits Main menu game starts by pressing space
-				mainMenu = False
-			
-			if mainMenu == False: #Return to main menu with esc
-				if event.key == pygame.K_ESCAPE: 
-					mainMenu = True
-				if event.key == pygame.K_d:
-					movRight = True
-				if event.key == pygame.K_a:
-					movLeft = True
-				if len(collideTerrain) > 0:
-					if event.key == pygame.K_SPACE:
-						jump = True
-				
+				if event.key == pygame.K_ESCAPE: #Restarts the session
+					main(True)	
+ 
+			if event.type == pygame.KEYUP:
+				if event.key == pygame.K_a and player.change_x < 0: #Stops movement
+					player.stop()
+				if event.key == pygame.K_d and player.change_x > 0:	#Stops movement
+					player.stop()
+
+		victory = pygame.sprite.collide_rect(player, player.level.ending) #Checks for collision with flag
 		
-		if event.type == pygame.KEYUP:
-			if event.key == pygame.K_a:
-				movLeft = False
-			elif event.key == pygame.K_d:
-				movRight = False
-			if event.key == pygame.K_SPACE:
-					jump = False
-		
+		# Update items in the level
+
+		if Mainmenu: #Updates main menu if it is open
+			menu.update()
+		elif Gameover: #Updates gameover if it is open
+			gg.update(player)
+		elif victory:	#Updates victory screen if it is open
+			victoryscreen.update(player)
+		else:	#Updates the game
+			game.update()
+			active_sprite_list.update()
+
+		# If the player gets near the right side, shift the world left (-x)
+		if player.rect.right > SCREEN_WIDTH:
+			player.rect.right = SCREEN_WIDTH
+ 
+		# If the player gets near the left side, shift the world right (+x)
+		if player.rect.left < 0:
+			player.rect.left = 0
+
+		# If player falls down GameOver!
+		if player.rect.top > SCREEN_HEIGHT:
+			Gameover = True
 	
-	screen.fill((0,213,255))
-	cloud_group.draw(screen)
-	cloud_group.update()
-	screen.blit(char.image, char.rect)
-	collideTerrain = pygame.sprite.spritecollide(char, stackOfTiles, False)
-	
-	if mainMenu:	#If menu open
-		screen.blit(MainMenuTiles.image, MainMenuTiles.rect)
-		char.update(False, False, False)
-		text_group.draw(screen)
-		text_group.update((255, 255, 255))
-			
+		# ALL CODE TO DRAW SHOULD GO BELOW THIS COMMENT
+
+		game.draw(screen)
+		active_sprite_list.draw(screen)
+		if Mainmenu:
+			menu.draw(screen)
+		if Gameover:
+			gg.draw(screen)
+		if victory:
+			victoryscreen.draw(screen)
+ 
+		# ALL CODE TO DRAW SHOULD GO ABOVE THIS COMMENT
+ 
+		# Limit to 60 frames per second
+		clock.tick(60)
+ 
+		# Updates the screen.
 		pygame.display.flip()
-	if mainMenu == False:	#if menu closed
-		
-		if movRight:
-			char.update(False, True, False)
-		if movLeft:
-			char.update(True, False, False)
-			
-		stackOfTiles.draw(screen)
-		
-		if jump:
-			if len(collideTerrain) > 0:
-				jumpStartingPoint = collideTerrain[0].Y
-
-			char.update(False, False, True, jumpStartingPoint)
-		
-		
-
-		elif len(collideTerrain) == 0 and jump == False:
-			char.Y += 5
-			char.rect = char.image.get_rect(topleft=(char.X, char.Y))
-
-		if char.Y <= jumpStartingPoint - 160:
-			jump = False
-		print(collideTerrain)
-		pygame.display.flip()
-	
-	clock.tick(60)
-	
-pygame.quit()
+ 
+	pygame.quit()
+ 
+if __name__ == "__main__":
+	main(True)
